@@ -108,14 +108,27 @@
       "type": "windows-restart"
     },
     {
-      "type": "windows-update"
+      "type": "windows-update",
+      "filters": [
+        "exclude:$_.Title -like '*Preview*'",
+        "include:$_.Title -like '*Cumulative Update for Windows*'",
+        "include:$_.AutoSelectOnWebSites"
+      ]
     },
     {
       "type": "powershell",
       "script": "provision.ps1"
     },
     {
+      "type": "powershell",
+      "script": "provision-openssh.ps1"
+    },
+    {
       "type": "windows-restart"
+    },
+    {
+      "type": "powershell",
+      "script": "eject-media.ps1"
     },
     {
       "type": "powershell",

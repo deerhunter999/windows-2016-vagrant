@@ -34,7 +34,8 @@ if (!(New-Object System.Security.Principal.WindowsPrincipal(
 }
 
 # install Guest Additions.
-if ((Get-WmiObject Win32_ComputerSystemProduct Vendor).Vendor -eq 'QEMU') {
+$systemVendor = (Get-WmiObject Win32_ComputerSystemProduct Vendor).Vendor
+if ($systemVendor -eq 'QEMU') {
     # install qemu-qa.
     $qemuAgentSetupUrl = "http://$env:PACKER_HTTP_ADDR/drivers/guest-agent/qemu-ga-x64.msi"
     $qemuAgentSetup = "$env:TEMP\qemu-ga-x64.msi"
@@ -57,7 +58,7 @@ if ((Get-WmiObject Win32_ComputerSystemProduct Vendor).Vendor -eq 'QEMU') {
     Remove-Item -Force "$spiceAgentDestination\vdagent-win-*"
     Start-Process "$spiceAgentDestination\vdservice.exe" install -Wait # NB the logs are inside C:\Windows\Temp
     Start-Service vdservice
-} else {
+} elseif ($systemVendor -eq 'innotek GmbH') {
     Write-Host 'Importing the Oracle (for VirtualBox) certificate as a Trusted Publisher...'
     E:\cert\VBoxCertUtil.exe add-trusted-publisher E:\cert\vbox-sha1.cer
     if ($LASTEXITCODE) {
@@ -71,74 +72,9 @@ if ((Get-WmiObject Win32_ComputerSystemProduct Vendor).Vendor -eq 'QEMU') {
     if ($p.ExitCode) {
         throw "failed to install with exit code $($p.ExitCode). Check the logs at C:\Program Files\Oracle\VirtualBox Guest Additions\install.log."
     }
-
-    Write-Host 'Ejecting the VirtualBox Guest Additions media...'
-    $ejectVolumeMediaExeUrl = 'https://github.com/rgl/EjectVolumeMedia/releases/download/v1.0.0/EjectVolumeMedia.exe'
-    $ejectVolumeMediaExeHash = 'f7863394085e1b3c5aa999808b012fba577b4a027804ea292abf7962e5467ba0'
-    $ejectVolumeMediaExe = "$env:TEMP\EjectVolumeMedia.exe"
-    Invoke-WebRequest $ejectVolumeMediaExeUrl -OutFile $ejectVolumeMediaExe
-    $ejectVolumeMediaExeActualHash = (Get-FileHash $ejectVolumeMediaExe -Algorithm SHA256).Hash
-    if ($ejectVolumeMediaExeActualHash -ne $ejectVolumeMediaExeHash) {
-        throw "the $ejectVolumeMediaExeUrl file hash $ejectVolumeMediaExeActualHash does not match the expected $ejectVolumeMediaExeHash"
-    }
-    &$ejectVolumeMediaExe E
+} else {
+    throw "Cannot install Guest Additions: Unsupported system ($systemVendor)."
 }
-
-# install OpenSSH (for rsync vagrant shared folders from a linux host and for general use on clients of this base box).
-# see https://github.com/PowerShell/Win32-OpenSSH/wiki/Install-Win32-OpenSSH
-# NB Binaries are in $openSshHome (C:\Program Files\OpenSSH).
-# NB Configuration, keys, and logs are in $openSshConfigHome (C:\ProgramData\ssh).
-Write-Host 'Installing the PowerShell/Win32-OpenSSH service...'
-$openSshHome = 'C:\Program Files\OpenSSH'
-$openSshConfigHome = 'C:\ProgramData\ssh'
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-function Install-ZippedApplication($destinationPath, $name, $url, $expectedHash, $expectedHashAlgorithm='SHA256') {
-    $localZipPath = "$env:TEMP\$name.zip"
-    Invoke-WebRequest $url -OutFile $localZipPath
-    $actualHash = (Get-FileHash $localZipPath -Algorithm $expectedHashAlgorithm).Hash
-    if ($actualHash -ne $expectedHash) {
-        throw "$name downloaded from $url to $localZipPath has $actualHash hash that does not match the expected $expectedHash"
-    }
-    [IO.Compression.ZipFile]::ExtractToDirectory($localZipPath, $destinationPath)
-    Remove-Item $localZipPath
-}
-function Install-OpenSshBinaries {
-    Install-ZippedApplication `
-        $openSshHome `
-        OpenSSH `
-        https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.6.0.0p1-Beta/OpenSSH-Win64.zip `
-        585d28ce1aa2935c8cd5570413b9214e6c80c41bda6ba6b1b206dbe63d7d2e76
-    Push-Location $openSshHome
-    Move-Item OpenSSH-Win64\* .
-    Remove-Item OpenSSH-Win64
-    Pop-Location
-}
-Install-OpenSshBinaries
-&"$openSshHome\install-sshd.ps1"
-&"$openSshHome\ssh-keygen.exe" -A
-if ($LASTEXITCODE) {
-    throw "Failed to run ssh-keygen with exit code $LASTEXITCODE"
-}
-Set-Content `
-    -Encoding Ascii `
-    "$openSshConfigHome\sshd_config" `
-    ( `
-        (Get-Content "$openSshConfigHome\sshd_config") `
-            -replace '#?\s*UseDNS .+','UseDNS no' `
-    )
-&"$openSshHome\FixHostFilePermissions.ps1" -Confirm:$false
-'sshd','ssh-agent' | ForEach-Object {
-    Set-Service $_ -StartupType Automatic
-    sc.exe failure $_ reset= 0 actions= restart/1000
-}
-sc.exe config sshd depend= ssh-agent
-New-NetFirewallRule -Protocol TCP -LocalPort 22 -Direction Inbound -Action Allow -DisplayName SSH | Out-Null
-Write-Host 'Installing the default vagrant insecure public key...'
-$authorizedKeysPath = "$env:USERPROFILE\.ssh\authorized_keys"
-mkdir -Force "$env:USERPROFILE\.ssh" | Out-Null
-Invoke-WebRequest `
-    'https://raw.github.com/mitchellh/vagrant/master/keys/vagrant.pub' `
-    -OutFile $authorizedKeysPath
 
 Write-Host 'Setting the vagrant account properties...'
 # see the ADS_USER_FLAG_ENUM enumeration at https://msdn.microsoft.com/en-us/library/aa772300(v=vs.85).aspx
