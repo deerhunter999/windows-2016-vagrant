@@ -1,13 +1,13 @@
 {
   "variables": {
     "disk_size": "61440",
-    "iso_url": "isos/SW_DVD9_Win_Server_STD_CORE_1709_64Bit_English_DC_STD_MLF_X21-49499.ISO",
-    "iso_checksum": "ca1108d5be2c091bfb57e8f3db3be1e8baa9c32802131f7a6e43e63f7b596591",
-    "iso_checksum_type": "sha256"
+    "iso_url": "file://./isos/Windows_InsiderPreview_Server_vNext_en-us_17677.iso",
+    "iso_checksum": "",
+    "iso_checksum_type": "none"
   },
   "builders": [
     {
-      "name": "windows-server-core-1709-amd64-libvirt",
+      "name": "windows-2019-amd64-libvirt",
       "type": "qemu",
       "accelerator": "kvm",
       "qemuargs": [
@@ -39,7 +39,7 @@
       "shutdown_command": "shutdown /s /t 0 /f /d p:4:1 /c \"Packer Shutdown\"",
       "http_directory": ".",
       "floppy_files": [
-        "windows-server-core-1709/autounattend.xml",
+        "windows-2019/autounattend.xml",
         "winrm.ps1",
         "drivers/vioserial/2k16/amd64/*.cat",
         "drivers/vioserial/2k16/amd64/*.inf",
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "name": "windows-server-core-1709-amd64-virtualbox",
+      "name": "windows-2019-amd64-virtualbox",
       "type": "virtualbox-iso",
       "guest_os_type": "Windows2016_64",
       "guest_additions_mode": "attach",
@@ -82,7 +82,7 @@
       "winrm_timeout": "2h",
       "shutdown_command": "shutdown /s /t 0 /f /d p:4:1 /c \"Packer Shutdown\"",
       "floppy_files": [
-        "windows-server-core-1709/autounattend.xml",
+        "windows-2019/autounattend.xml",
         "winrm.ps1"
       ]
     }
@@ -98,13 +98,22 @@
     },
     {
       "type": "powershell",
+      "inline": "Uninstall-WindowsFeature FS-SMB1"
+    },
+    {
+      "type": "powershell",
       "script": "virtualbox-prevent-vboxsrv-resolution-delay.ps1"
     },
     {
       "type": "windows-restart"
     },
     {
-      "type": "windows-update"
+      "type": "windows-update",
+      "filters": [
+        "exclude:$_.Title -like '*Preview*'",
+        "include:$_.Title -like '*Cumulative Update for Windows*'",
+        "include:$_.AutoSelectOnWebSites"
+      ]
     },
     {
       "type": "powershell",
@@ -113,6 +122,17 @@
     {
       "type": "powershell",
       "script": "provision-openssh.ps1"
+    },
+    {
+      "type": "windows-restart"
+    },
+    {
+      "type": "powershell",
+      "script": "eject-media.ps1"
+    },
+    {
+      "type": "powershell",
+      "script": "optimize.ps1"
     }
   ],
   "post-processors": [

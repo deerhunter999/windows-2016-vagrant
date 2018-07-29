@@ -1,13 +1,13 @@
 {
   "variables": {
     "disk_size": "61440",
-    "iso_url": "isos/SW_DVD9_Win_Server_STD_CORE_1709_64Bit_English_DC_STD_MLF_X21-49499.ISO",
-    "iso_checksum": "ca1108d5be2c091bfb57e8f3db3be1e8baa9c32802131f7a6e43e63f7b596591",
+    "iso_url": "http://download.microsoft.com/download/1/B/F/1BFE5194-5951-452C-B62C-B2F667F9B86D/14393.0.160715-1616.RS1_RELEASE_CLIENTENTERPRISE_S_EVAL_X64FRE_EN-US.ISO",
+    "iso_checksum": "af9a46ddd2a88ea01e9d3a52f56cf48e6e9d989e5a35f6e88d68be48dccfcb8d",
     "iso_checksum_type": "sha256"
   },
   "builders": [
     {
-      "name": "windows-server-core-1709-amd64-libvirt",
+      "name": "windows-10-amd64-libvirt",
       "type": "qemu",
       "accelerator": "kvm",
       "qemuargs": [
@@ -39,26 +39,26 @@
       "shutdown_command": "shutdown /s /t 0 /f /d p:4:1 /c \"Packer Shutdown\"",
       "http_directory": ".",
       "floppy_files": [
-        "windows-server-core-1709/autounattend.xml",
+        "windows-10/autounattend.xml",
         "winrm.ps1",
-        "drivers/vioserial/2k16/amd64/*.cat",
-        "drivers/vioserial/2k16/amd64/*.inf",
-        "drivers/vioserial/2k16/amd64/*.sys",
-        "drivers/viostor/2k16/amd64/*.cat",
-        "drivers/viostor/2k16/amd64/*.inf",
-        "drivers/viostor/2k16/amd64/*.sys",
-        "drivers/NetKVM/2k16/amd64/*.cat",
-        "drivers/NetKVM/2k16/amd64/*.inf",
-        "drivers/NetKVM/2k16/amd64/*.sys",
-        "drivers/qxldod/2k16/amd64/*.cat",
-        "drivers/qxldod/2k16/amd64/*.inf",
-        "drivers/qxldod/2k16/amd64/*.sys"
+        "drivers/vioserial/w10/amd64/*.cat",
+        "drivers/vioserial/w10/amd64/*.inf",
+        "drivers/vioserial/w10/amd64/*.sys",
+        "drivers/viostor/w10/amd64/*.cat",
+        "drivers/viostor/w10/amd64/*.inf",
+        "drivers/viostor/w10/amd64/*.sys",
+        "drivers/NetKVM/w10/amd64/*.cat",
+        "drivers/NetKVM/w10/amd64/*.inf",
+        "drivers/NetKVM/w10/amd64/*.sys",
+        "drivers/qxldod/w10/amd64/*.cat",
+        "drivers/qxldod/w10/amd64/*.inf",
+        "drivers/qxldod/w10/amd64/*.sys"
       ]
     },
     {
-      "name": "windows-server-core-1709-amd64-virtualbox",
+      "name": "windows-10-amd64-virtualbox",
       "type": "virtualbox-iso",
-      "guest_os_type": "Windows2016_64",
+      "guest_os_type": "Windows10_64",
       "guest_additions_mode": "attach",
       "headless": true,
       "vboxmanage": [
@@ -82,7 +82,7 @@
       "winrm_timeout": "2h",
       "shutdown_command": "shutdown /s /t 0 /f /d p:4:1 /c \"Packer Shutdown\"",
       "floppy_files": [
-        "windows-server-core-1709/autounattend.xml",
+        "windows-10/autounattend.xml",
         "winrm.ps1"
       ]
     }
@@ -94,7 +94,11 @@
     },
     {
       "type": "powershell",
-      "inline": "Uninstall-WindowsFeature Windows-Defender-Features"
+      "inline": "Set-MpPreference -DisableRealtimeMonitoring $true"
+    },
+    {
+      "type": "powershell",
+      "inline": "Disable-WindowsOptionalFeature -FeatureName SMB1Protocol -Online -Remove -NoRestart"
     },
     {
       "type": "powershell",
@@ -104,7 +108,12 @@
       "type": "windows-restart"
     },
     {
-      "type": "windows-update"
+      "type": "windows-update",
+      "filters": [
+        "exclude:$_.Title -like '*Preview*'",
+        "include:$_.Title -like '*Cumulative Update for Windows*'",
+        "include:$_.AutoSelectOnWebSites"
+      ]
     },
     {
       "type": "powershell",
@@ -113,6 +122,17 @@
     {
       "type": "powershell",
       "script": "provision-openssh.ps1"
+    },
+    {
+      "type": "windows-restart"
+    },
+    {
+      "type": "powershell",
+      "script": "eject-media.ps1"
+    },
+    {
+      "type": "powershell",
+      "script": "optimize.ps1"
     }
   ],
   "post-processors": [

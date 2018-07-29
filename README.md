@@ -27,6 +27,13 @@ packer build -var iso_url=<ISO_URL> -var iso_checksum=<ISO_SHA256_CHECKSUM> -onl
 **NB** if you are having trouble building the base box due to floppy drive removal errors try adding, as a
 workaround, `"post_shutdown_delay": "30s",` to the `windows-2016.json` file.
 
+**NB** To troubleshoot, before launching `packer`, you can set the following environment variables:
+
+```bash
+export CHECKPOINT_DISABLE=1
+export PACKER_LOG=1
+export PACKER_LOG_PATH=packer.log
+```
 
 You can then add the base box to your local vagrant installation with:
 
@@ -65,6 +72,8 @@ If you want to access the UI run:
 ```bash
 spicy --uri 'spice+unix:///tmp/packer-windows-2016-amd64-libvirt-spice.socket'
 ```
+
+**NB** the packer template file defines `qemuargs` (which overrides the default packer qemu arguments), if you modify it, verify if you also need include the default packer qemu arguments (see [builder/qemu/step_run.go](https://github.com/hashicorp/packer/blob/master/builder/qemu/step_run.go) or start packer without `qemuargs` defined to see how it starts qemu).
 
 
 ## WinRM access
